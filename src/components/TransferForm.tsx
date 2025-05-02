@@ -48,7 +48,7 @@ const TransferForm = () => {
           console.log('Tokens fetched for wallet:', { sourceChain, walletAddress: address, tokens: fetchedTokens });
           setTokens(fetchedTokens.map(token => ({
             ...token,
-            formattedBalance: (Number(token.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
+            formattedBalance: (Number(token.balance) / 1e6).toFixed(2)
           })));
           toast({ title: "Wallet connected", description: "Your wallet has been successfully connected." });
         } else {
@@ -81,7 +81,7 @@ const TransferForm = () => {
           console.log('Tokens fetched for chain change:', { sourceChain: newSourceChain, walletAddress: address, tokens: fetchedTokens });
           setTokens(fetchedTokens.map(token => ({
             ...token,
-            formattedBalance: (Number(token.balance) / (newSourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
+            formattedBalance: (Number(token.balance) / 1e6).toFixed(2)
           })));
         } else {
           setTokens([]);
@@ -113,7 +113,7 @@ const TransferForm = () => {
       if (newToken) {
         const formattedToken = {
           ...newToken,
-          formattedBalance: (Number(newToken.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
+          formattedBalance: (Number(newToken.balance) / 1e6).toFixed(2)
         };
         setTokens(prevTokens => {
           const exists = prevTokens.some(t => t.address === newToken.address || t.denom === newToken.denom);
@@ -126,7 +126,7 @@ const TransferForm = () => {
         });
         setSelectedToken(newToken.name);
         setTokenAddress(newToken.denom || newToken.address || '');
-        toast({ title: "Token added", description: `Found ${newToken.name} with balance ${formattedToken.formattedBalance}.` });
+        toast({ title: "Token added", description: `Found ${newToken.name} with balance ${formattedToken.formattedBalance}. Added to dropdown.` });
       } else {
         toast({ title: "No token found", description: "Could not fetch token at this address.", variant: "destructive" });
       }
@@ -178,6 +178,10 @@ const TransferForm = () => {
     }
   };
 
+  const clearLogs = () => {
+    setTransactionLogs([]);
+  };
+
   useEffect(() => {
     const fetchTokensForChain = async () => {
       if (walletAddress && !walletAddress.startsWith('Error') && sourceChain) {
@@ -187,7 +191,7 @@ const TransferForm = () => {
           console.log('Tokens fetched in useEffect:', { sourceChain, walletAddress, tokens: newTokens });
           setTokens(newTokens.map(token => ({
             ...token,
-            formattedBalance: (Number(token.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
+            formattedBalance: (Number(token.balance) / 1e6).toFixed(2)
           })));
           setError(null);
         } catch (error) {
@@ -213,7 +217,7 @@ const TransferForm = () => {
     const selectedTokenData = tokens.find(t => t.name === selectedToken);
     if (!selectedTokenData) return false;
     try {
-      const balance = Number(selectedTokenData.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6);
+      const balance = Number(selectedTokenData.balance) / 1e6;
       if (Number(amount) > balance) return false;
       if (parseInt(numTransactions) < 1 || parseInt(numTransactions) > 100) return false;
     } catch {
@@ -382,13 +386,18 @@ const TransferForm = () => {
       </div>
 
       <div className="mb-4">
-        <label className="block font-medium text-sm mb-1">Custom Token Contract Address</label>
+        <label className="block font-medium text-sm mb-1">Search Token by Contract Address</label>
         <div className="flex gap-2">
           <Input
             type="text"
             value={customContractAddress}
             onChange={(e) => setCustomContractAddress(e.target.value)}
-            placeholder={sourceChain.startsWith('Sepolia') ? "ERC20 address (0x...)" : "CW20 address (bbn1...)"}
+            placeholder={
+              sourceChain.includes('Babylon') ? "CW20 address (bbn1...)" :
+              sourceChain.includes('Xion') ? "CW20 address (xion1...)" :
+              sourceChain.includes('Corn') && !sourceChain.includes('Testnet 1') ? "CW20 address (corn1...)" :
+              "ERC20 address (0x...)"
+            }
             className="w-full"
             disabled={isLoading || !walletAddress || walletAddress.startsWith('Error')}
           />
@@ -468,7 +477,7 @@ const TransferForm = () => {
             Processing...
           </span>
         ) : (
-           'Transfer'
+          'Transfer'
         )}
       </Button>
 
@@ -484,13 +493,37 @@ const TransferForm = () => {
 
       {transactionLogs.length > 0 && (
         <div className="mt-4">
-          <h3 className="font-medium mb-2">Transaction Logs</h3>
-          <div className="bg-gray-800 text-white p-4 rounded-lg max-h-64 overflow-y-auto font-mono text-sm border border-muted">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-medium text-muted-foreground">Console Output</h3>
+            <Button
+              onClick={clearLogs}
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+              Clear
+            </Button>
+          </div>
+          <div className="bg-gray-800 text-white p-4 rounded-lg max-h-64 overflow-y-auto font-mono text-sm border border-gray-700">
             {transactionLogs.map((log, index) => (
               <p key={index} className={`mb-1 ${
                 log.type === 'success' ? 'text-green-500' : 
-                log.type === 'error' ? 'text-destructive' : 
-                'text-white'
+                log.type === 'error' ? 'text-red-500' : 
+                'text-gray-300'
               }`}>
                 {log.message}
               </p>
