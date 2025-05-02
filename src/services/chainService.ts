@@ -30,11 +30,14 @@ export const getExplorerUrl = (txHash: string, chain: string): string => {
 
 export const deriveAddress = async (privateKey: string, sourceChain: string): Promise<string> => {
   try {
-    if (!privateKey) return '';
+    if (!privateKey) {
+      console.log('deriveAddress: No private key provided');
+      return '';
+    }
     if (sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) {
-      const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
-      const account = privateKeyToAccount(formattedPrivateKey);
-      console.log(`Derived EVM address for ${sourceChain}:`, account.address);
+      const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+      const account = privateKeyToAccount(formattedPrivateKey as `0x${string}`);
+      console.log(`deriveAddress: Derived EVM address for ${sourceChain}: ${account.address}`);
       return account.address;
     } else {
       const prefix = sourceChain.includes('Babylon') ? 'bbn' : 
@@ -45,11 +48,11 @@ export const deriveAddress = async (privateKey: string, sourceChain: string): Pr
         prefix
       );
       const address = (await wallet.getAccounts())[0].address;
-      console.log(`Derived Cosmos address for ${sourceChain}:`, address);
+      console.log(`deriveAddress: Derived Cosmos address for ${sourceChain}: ${address}`);
       return address;
     }
   } catch (error) {
-    console.error('Error deriving address:', error);
+    console.error(`deriveAddress: Error for ${sourceChain}:`, error);
     return `Error: ${(error as Error).message}`;
   }
 };
@@ -60,8 +63,10 @@ export const fetchTokens = async (
   useCustomRpc: boolean,
   customRpc: string
 ): Promise<Token[]> => {
+  console.log('fetchTokens: Starting', { walletAddress, sourceChain, useCustomRpc, customRpc });
+
   if (!walletAddress || walletAddress.startsWith('Error') || !sourceChain) {
-    console.log('fetchTokens: Invalid input', { walletAddress, sourceChain });
+    console.error('fetchTokens: Invalid input', { walletAddress, sourceChain });
     return [];
   }
 
@@ -69,36 +74,49 @@ export const fetchTokens = async (
   const tokenList = TOKEN_CONFIG[sourceChain] || [];
   const tokens: Token[] = [];
 
-  try {
-    if (!rpcUrl) {
-      console.error(`fetchTokens: No RPC URL for ${sourceChain}`);
-      return [];
-    }
-    if (!tokenList.length) {
-      console.error(`fetchTokens: No tokens configured for ${sourceChain}`);
-      return [];
-    }
-    
-    console.log('fetchTokens: Connecting to RPC', { sourceChain, rpcUrl, tokenList });
+  if (!rpcUrl) {
+    console.error(`fetchTokens: No RPC URL for ${sourceChain}`);
+    return [];
+  }
+  if (!tokenList.length) {
+    console.error(`fetchTokens: No tokens configured for ${sourceChain}`);
+    return [];
+  }
 
-    if (sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) {
+  console.log('fetchTokens: RPC and token config', { rpcUrl, tokenList });
+
+  if (sourceChain.startsWith('Sepolia')) {
+    try {
+      console.log('fetchTokens: Connecting to Sepolia RPC', { rpcUrl });
       const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
+
       for (const token of tokenList) {
-        console.log(`Fetching balance for ${token.name} (${token.type})`, { walletAddress, tokenAddress: token.address });
+        console.log(`fetchTokens: Processing ${token.name} (${token.type})`, { walletAddress, tokenAddress: token.address });
         let balance;
         if (token.type === 'native') {
-          const formattedAddress = walletAddress.startsWith('0x') ? walletAddress as `0x${string}` : `0x${walletAddress}` as `0x${string}`;
-          balance = await publicClient.getBalance({ address: formattedAddress });
-          console.log(`Native balance for ${token.name}:`, balance.toString());
+          try {
+            const formattedAddress = walletAddress.startsWith('0x') ? walletAddress : `0x${walletAddress}`;
+            balance = await publicClient.getBalance({ address: formattedAddress as `0x${string}` });
+            console.log(`fetchTokens: Native balance for ${token.name}: ${balance.toString()} wei`);
+          } catch (nativeError) {
+            console.error(`fetchTokens: Error fetching native balance for ${token.name}:`, nativeError);
+            balance = '0';
+          }
         } else {
-          const tokenAddr = token.address?.startsWith('0x') ? token.address as `0x${string}` : `0x${token.address}` as `0x${string}`;
-          balance = await publicClient.readContract({
-            address: tokenAddr,
-            abi: ERC20_ABI,
-            functionName: 'balanceOf',
-            args: [walletAddress.startsWith('0x') ? walletAddress as `0x${string}` : `0x${walletAddress}` as `0x${string}`]
-          });
-          console.log(`ERC20 balance for ${token.name}:`, balance.toString());
+          const tokenAddr = token.address?.startsWith('0x') ? token.address : `0x${token.address}`;
+          console.log(`fetchTokens: Querying ERC20 contract at ${tokenAddr}`);
+          try {
+            balance = await publicClient.readContract({
+              address: tokenAddr as `0x${string}`,
+              abi: ERC20_ABI,
+              functionName: 'balanceOf',
+              args: [walletAddress.startsWith('0x') ? walletAddress : `0x${walletAddress}` as `0x${string}`]
+            });
+            console.log(`fetchTokens: ERC20 balance for ${token.name}: ${balance.toString()}`);
+          } catch (contractError) {
+            console.error(`fetchTokens: Error fetching ERC20 balance for ${token.name} at ${tokenAddr}:`, contractError);
+            balance = '0';
+          }
         }
         tokens.push({ 
           name: token.name, 
@@ -107,38 +125,97 @@ export const fetchTokens = async (
           type: token.type 
         });
       }
-    } else {
-      const stargateClient = await StargateClient.connect(rpcUrl);
-      const cosmWasmClient = await CosmWasmClient.connect(rpcUrl);
-      for (const token of tokenList) {
-        console.log(`Fetching balance for ${token.name} (${token.type})`, { walletAddress, denom: token.denom });
-        let balance;
-        if (token.type === 'native') {
-          const result = await stargateClient.getBalance(walletAddress, token.denom!);
-          balance = result.amount;
-          console.log(`Native balance for ${token.name}:`, balance);
-        } else {
-          const queryMsg = { balance: { address: walletAddress } };
-          const result = await cosmWasmClient.queryContractSmart(token.denom!, queryMsg);
-          balance = result.balance;
-          console.log(`CW20 balance for ${token.name}:`, balance);
-        }
-        tokens.push({ 
-          name: token.name, 
-          denom: token.denom, 
-          balance, 
-          type: token.type 
-        });
-      }
+      console.log('fetchTokens: Completed for Sepolia', { tokens });
+      return tokens;
+    } catch (rpcError) {
+      console.error(`fetchTokens: RPC error for ${sourceChain}:`, rpcError);
+      return [];
     }
-    console.log(`fetchTokens: Successfully fetched tokens for ${sourceChain}:`, tokens);
-    return tokens;
-  } catch (error) {
-    console.error(`fetchTokens: Error for ${sourceChain}:`, error);
+  } else {
+    console.log(`fetchTokens: Skipping ${sourceChain} (Cosmos chain) until valid CW20 addresses are provided`);
     return [];
   }
 };
 
+export const fetchTokenByContract = async (
+  walletAddress: string,
+  sourceChain: string,
+  contractAddress: string,
+  useCustomRpc: boolean,
+  customRpc: string
+): Promise<Token | null> => {
+  console.log('fetchTokenByContract: Starting', { walletAddress, sourceChain, contractAddress, useCustomRpc, customRpc });
+
+  if (!walletAddress || walletAddress.startsWith('Error') || !sourceChain || !contractAddress) {
+    console.error('fetchTokenByContract: Invalid input', { walletAddress, sourceChain, contractAddress });
+    return null;
+  }
+
+  const rpcUrl = useCustomRpc && customRpc ? customRpc : DEFAULT_RPCS[sourceChain];
+  if (!rpcUrl) {
+    console.error(`fetchTokenByContract: No RPC URL for ${sourceChain}`);
+    return null;
+  }
+
+  console.log('fetchTokenByContract: RPC config', { rpcUrl });
+
+  if (sourceChain.startsWith('Sepolia')) {
+    try {
+      console.log('fetchTokenByContract: Connecting to Sepolia RPC', { rpcUrl });
+      const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
+
+      const tokenAddr = contractAddress.startsWith('0x') ? contractAddress : `0x${contractAddress}`;
+      console.log(`fetchTokenByContract: Querying ERC20 contract at ${tokenAddr}`);
+
+      // Try to fetch token name (optional, fallback to address if fails)
+      let tokenName = `Token@${tokenAddr.slice(0, 6)}`;
+      try {
+        const name = await publicClient.readContract({
+          address: tokenAddr as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'name',
+          args: []
+        });
+        tokenName = name.toString().substring(0, 10); // Limit length
+        console.log(`fetchTokenByContract: Token name: ${tokenName}`);
+      } catch (nameError) {
+        console.warn(`fetchTokenByContract: Could not fetch token name for ${tokenAddr}:`, nameError);
+      }
+
+      // Fetch balance
+      let balance;
+      try {
+        balance = await publicClient.readContract({
+          address: tokenAddr as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'balanceOf',
+          args: [walletAddress.startsWith('0x') ? walletAddress : `0x${walletAddress}` as `0x${string}`]
+        });
+        console.log(`fetchTokenByContract: ERC20 balance for ${tokenName}: ${balance.toString()}`);
+      } catch (balanceError) {
+        console.error(`fetchTokenByContract: Error fetching ERC20 balance for ${tokenName} at ${tokenAddr}:`, balanceError);
+        return null;
+      }
+
+      const token: Token = {
+        name: tokenName,
+        address: tokenAddr,
+        balance: balance.toString(),
+        type: 'erc20'
+      };
+      console.log('fetchTokenByContract: Completed for Sepolia', { token });
+      return token;
+    } catch (rpcError) {
+      console.error(`fetchTokenByContract: RPC error for ${sourceChain}:`, rpcError);
+      return null;
+    }
+  } else {
+    console.log(`fetchTokenByContract: Skipping ${sourceChain} (Cosmos chain) until CW20 support is added`);
+    return null;
+  }
+};
+
+// Note: executeTransfer remains unchanged from previous version
 export const executeTransfer = async (
   privateKey: string,
   sourceChain: string,
@@ -181,8 +258,8 @@ export const executeTransfer = async (
       if (sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) {
         const rpcUrl = useCustomRpc && customRpc ? customRpc : DEFAULT_RPCS[sourceChain];
         const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
-        const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
-        const account = privateKeyToAccount(formattedPrivateKey);
+        const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+        const account = privateKeyToAccount(formattedPrivateKey as `0x${string}`);
         const walletClient = createWalletClient({
           chain: sepolia,
           transport: http(rpcUrl),
@@ -190,16 +267,16 @@ export const executeTransfer = async (
         });
         const gasPriceWei = BigInt(parseFloat(gasPrice) * 1e9);
         const sourceContractAddr = sourceContract.startsWith('0x') ? 
-          sourceContract as `0x${string}` : 
+          sourceContract : 
           `0x${sourceContract}` as `0x${string}`;
         const tokenAddr = tokenAddress.startsWith('0x') ? 
-          tokenAddress as `0x${string}` : 
+          tokenAddress : 
           `0x${tokenAddress}` as `0x${string}`;
         const destAddr = destAddress.startsWith('0x') ? 
-          destAddress as `0x${string}` : 
+          destAddress : 
           `0x${destAddress}` as `0x${string}`;
         const tx = await walletClient.writeContract({
-          address: sourceContractAddr,
+          address: sourceContractAddr as `0x${string}`,
           abi: UCS03_ABI,
           functionName: 'sendPacket',
           args: [destAddr, channelId, amount, tokenAddr],
@@ -259,7 +336,7 @@ export const executeTransfer = async (
     const slaMessage = getSlaMessage(sourceChain, destChain);
     return `Completed ${numTxs} transfers. ${slaMessage}`;
   } catch (error) {
-    console.error('Transfer error:', error);
+    console.error('executeTransfer: Error:', error);
     updateLogs({ 
       message: `Error: ${(error as Error).message}`,
       type: 'error'
