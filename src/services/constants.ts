@@ -98,34 +98,33 @@ export const deployments: DeploymentInfo[] = [
 ];
 
 export const TOKEN_CONFIG: TokenConfig = {
+  'Sepolia Testnet': [
+    { name: 'ETH', address: '0x0000000000000000000000000000000000000000', type: 'native' },
+    { name: 'USDC', address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', type: 'erc20' }
+  ],
   'Babylon Testnet': [
     { name: 'ubbn', denom: 'ubbn', type: 'native' },
-    // Replace with real CW20 contract address
-    { name: 'cw20', denom: 'bbn1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'cw20' }
+    // TODO: Replace with real CW20 contract address from Babylon testnet
+    { name: 'CW20', denom: 'bbn1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'cw20' }
   ],
   'Xion Testnet': [
     { name: 'uxion', denom: 'uxion', type: 'native' },
-    // Replace with real CW20 contract address
-    { name: 'cw20', denom: 'xion1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'cw20' }
+    // TODO: Replace with real CW20 contract address from Xion testnet
+    { name: 'CW20', denom: 'xion1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'cw20' }
   ],
   'Corn Testnet': [
     { name: 'ucorn', denom: 'ucorn', type: 'native' },
-    // Replace with real CW20 contract address
-    { name: 'cw20', denom: 'corn1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'cw20' }
-  ],
-  'Sepolia Testnet': [
-    { name: 'ETH', address: '0x0000000000000000000000000000000000000000', type: 'native' },
-    // Real Sepolia USDC contract
-    { name: 'USDC', address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', type: 'erc20' }
+    // TODO: Replace with real CW20 contract address from Corn testnet
+    { name: 'CW20', denom: 'corn1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'cw20' }
   ],
   'Bob Testnet': [
     { name: 'ETH', address: '0x0000000000000000000000000000000000000000', type: 'native' },
-    // Replace with real ERC20 contract address
+    // TODO: Replace with real ERC20 contract address from Bob testnet
     { name: 'ERC20', address: '0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'erc20' }
   ],
   'Corn Testnet 1': [
     { name: 'ETH', address: '0x0000000000000000000000000000000000000000', type: 'native' },
-    // Replace with real ERC20 contract address
+    // TODO: Replace with real ERC20 contract address from Corn Testnet 1
     { name: 'ERC20', address: '0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'erc20' }
   ]
 };
@@ -151,6 +150,13 @@ export const ERC20_ABI = [
     name: 'balanceOf',
     inputs: [{ name: 'account', type: 'address' }],
     outputs: [{ name: 'balance', type: 'uint256' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'name',
+    inputs: [],
+    outputs: [{ name: '', type: 'string' }],
     stateMutability: 'view'
   }
 ];
