@@ -1,9 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
 import { Token, TransactionLog } from '../services/types';
 import { channels, DEFAULT_RPCS, TOKEN_CONFIG } from '../services/constants';
 import { deriveAddress, fetchTokens, executeTransfer, getChainBadgeClass, getSlaMessage } from '../services/chainService';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const TransferForm = () => {
   // Form state
@@ -92,11 +98,10 @@ const TransferForm = () => {
   };
 
   // Handle token selection
-  const handleTokenSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newToken = e.target.value;
-    setSelectedToken(newToken);
+  const handleTokenSelection = (value: string) => {
+    setSelectedToken(value);
     
-    const token = tokens.find(t => t.name === newToken);
+    const token = tokens.find(t => t.name === value);
     setTokenAddress(token ? (token.denom || token.address || '') : '');
   };
 
@@ -312,29 +317,29 @@ const TransferForm = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Token Selection with Balances */}
+        {/* Token Selection with Balances - Using shadcn/ui Select */}
         <div className="mb-4">
           <label className="block font-medium text-sm mb-1">Token</label>
-          <div className="relative">
-            <select
-              value={selectedToken}
-              onChange={handleTokenSelection}
-              className="w-full rounded-md border border-muted bg-muted/50 px-3 py-2 text-sm ring-offset-background appearance-none focus:outline-none focus:ring-2 focus:ring-ring"
-              disabled={tokens.length === 0}
-            >
-              <option value="">Select a token</option>
-              {tokens.map(token => (
-                <option key={token.name} value={token.name}>
-                  {token.name} ({token.balance})
-                </option>
-              ))}
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-              <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </div>
+          <Select
+            value={selectedToken}
+            onValueChange={handleTokenSelection}
+            disabled={tokens.length === 0}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select a token" />
+            </SelectTrigger>
+            <SelectContent>
+              {tokens.length === 0 ? (
+                <SelectItem value="">No tokens available</SelectItem>
+              ) : (
+                tokens.map(token => (
+                  <SelectItem key={token.name} value={token.name}>
+                    {token.name} ({token.balance})
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Amount Input */}
