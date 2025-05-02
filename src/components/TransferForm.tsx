@@ -49,6 +49,7 @@ const TransferForm = () => {
         
         if (!address.startsWith('Error')) {
           const tokens = await fetchTokens(address, sourceChain, useCustomRpc, customRpc);
+          console.log('Tokens fetched for wallet:', tokens);
           setTokens(tokens.map(token => ({
             ...token,
             formattedBalance: (Number(token.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
@@ -91,6 +92,7 @@ const TransferForm = () => {
         
         if (!address.startsWith('Error')) {
           const tokens = await fetchTokens(address, newSourceChain, useCustomRpc, customRpc);
+          console.log('Tokens fetched for chain change:', tokens);
           setTokens(tokens.map(token => ({
             ...token,
             formattedBalance: (Number(token.balance) / (newSourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
@@ -171,13 +173,14 @@ const TransferForm = () => {
         setIsLoading(true);
         try {
           const newTokens = await fetchTokens(walletAddress, sourceChain, useCustomRpc, customRpc);
+          console.log('Tokens fetched in useEffect:', newTokens);
           setTokens(newTokens.map(token => ({
             ...token,
             formattedBalance: (Number(token.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
           })));
           setError(null);
         } catch (error) {
-          console.error('Error fetching tokens:', error);
+          console.error('Error fetching tokens in useEffect:', error);
           setError(error.message);
           toast({
             title: "Error fetching tokens",
@@ -250,7 +253,7 @@ const TransferForm = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Source Chain Selection */}
+            {/* Source زنجیره Selection */}
             <div className="mb-4">
               <label className="block font-medium text-sm mb-1">Source Chain</label>
               <div className="relative">
