@@ -1,53 +1,53 @@
-
 import { AllChannels, DeploymentInfo, TokenConfig } from './types';
 
 // Universal chain IDs
 export const universalChainIds = {
-  "babylon": "bbn-test-5",
-  "xion": "xion-testnet-2",
-  "ethereum": "11155111",
-  "bob": "60808",
-  "corn": "21000001"
+  "Babylon Testnet": "bbn-test-5",
+  "Xion Testnet": "xion-testnet-2",
+  "Sepolia Testnet": "11155111",
+  "Bob Testnet": "60808",
+  "Corn Testnet": "21000001",
+  "Corn Testnet 1": "21000000"
 };
 
 // Default RPC endpoints
 export const DEFAULT_RPCS: Record<string, string> = {
-  'ethereum.11155111': 'https://rpc.sepolia.org',
-  'babylon.bbn-test-5': 'https://rpc.bbn-test-5.union.network',
-  'xion.xion-testnet-2': 'https://rpc.xion-testnet-2.union.network',
-  'bob.60808': 'https://rpc.bob-testnet.union.network',
-  'corn.21000000': 'https://rpc.corn-testnet.union.network',
-  'corn.21000001': 'https://rpc.corn-testnet-1.union.network'
+  'Sepolia Testnet': 'https://rpc.sepolia.org',
+  'Babylon Testnet': 'https://rpc.bbn-test-5.union.network',
+  'Xion Testnet': 'https://rpc.xion-testnet-2.union.network',
+  'Bob Testnet': 'https://rpc.bob-testnet.union.network',
+  'Corn Testnet': 'https://rpc.corn-testnet.union.network',
+  'Corn Testnet 1': 'https://rpc.corn-testnet-1.union.network'
 };
 
 // Channels data
 export const channels: AllChannels = {
-  "babylon.bbn-test-5": {
+  "Babylon Testnet": {
     "4": {
       "sla": "PT20M",
-      "comments": ["xion.xion-testnet-2"]
+      "comments": ["Xion Testnet"]
     },
     "3": {
       "sla": "PT15H",
-      "comments": ["corn.21000001"]
+      "comments": ["Corn Testnet"]
     }
   },
-  "xion.xion-testnet-2": {
+  "Xion Testnet": {
     "3": {
       "sla": "PT20M",
-      "comments": ["babylon.bbn-test-5"]
+      "comments": ["Babylon Testnet"]
     }
   },
-  "corn.21000001": {
+  "Corn Testnet": {
     "3": {
       "sla": "PT15H",
-      "comments": ["babylon.bbn-test-5"]
+      "comments": ["Babylon Testnet"]
     }
   },
-  "ethereum.11155111": {
+  "Sepolia Testnet": {
     "0": {
       "sla": "PT15H",
-      "comments": ["babylon.bbn-test-5"]
+      "comments": ["Babylon Testnet"]
     }
   }
 };
@@ -55,7 +55,7 @@ export const channels: AllChannels = {
 // Deployments data
 export const deployments: DeploymentInfo[] = [
   {
-    "universal_chain_id": "babylon.bbn-test-5",
+    "universal_chain_id": "Babylon Testnet",
     "deployments": {
       "app": {
         "ucs03": {
@@ -67,7 +67,7 @@ export const deployments: DeploymentInfo[] = [
     }
   },
   {
-    "universal_chain_id": "xion.xion-testnet-2",
+    "universal_chain_id": "Xion Testnet",
     "deployments": {
       "app": {
         "ucs03": {
@@ -79,7 +79,7 @@ export const deployments: DeploymentInfo[] = [
     }
   },
   {
-    "universal_chain_id": "ethereum.11155111",
+    "universal_chain_id": "Sepolia Testnet",
     "deployments": {
       "app": {
         "ucs03": {
@@ -91,7 +91,7 @@ export const deployments: DeploymentInfo[] = [
     }
   },
   {
-    "universal_chain_id": "bob.60808",
+    "universal_chain_id": "Bob Testnet",
     "deployments": {
       "app": {
         "ucs03": {
@@ -103,7 +103,7 @@ export const deployments: DeploymentInfo[] = [
     }
   },
   {
-    "universal_chain_id": "corn.21000001",
+    "universal_chain_id": "Corn Testnet",
     "deployments": {
       "app": {
         "ucs03": {
@@ -118,27 +118,27 @@ export const deployments: DeploymentInfo[] = [
 
 // Token configurations
 export const TOKEN_CONFIG: TokenConfig = {
-  'babylon.bbn-test-5': [
+  'Babylon Testnet': [
     { name: 'ubbn', denom: 'ubbn', type: 'native' },
     { name: 'cw20', denom: 'bbn1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf', type: 'cw20' }
   ],
-  'xion.xion-testnet-2': [
+  'Xion Testnet': [
     { name: 'uxion', denom: 'uxion', type: 'native' },
     { name: 'cw20', denom: 'xion1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf', type: 'cw20' }
   ],
-  'corn.21000001': [
+  'Corn Testnet': [
     { name: 'ucorn', denom: 'ucorn', type: 'native' },
     { name: 'cw20', denom: 'corn1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf', type: 'cw20' }
   ],
-  'ethereum.11155111': [
+  'Sepolia Testnet': [
     { name: 'ETH', address: '0x0000000000000000000000000000000000000000', type: 'native' },
     { name: 'ERC20', address: '0xabcdef1234567890abcdef1234567890abcdef12', type: 'erc20' }
   ],
-  'bob.60808': [
+  'Bob Testnet': [
     { name: 'ETH', address: '0x0000000000000000000000000000000000000000', type: 'native' },
     { name: 'ERC20', address: '0xabcdef1234567890abcdef1234567890abcdef13', type: 'erc20' }
   ],
-  'corn.21000000': [
+  'Corn Testnet 1': [
     { name: 'ETH', address: '0x0000000000000000000000000000000000000000', type: 'native' },
     { name: 'ERC20', address: '0xabcdef1234567890abcdef1234567890abcdef14', type: 'erc20' }
   ]
