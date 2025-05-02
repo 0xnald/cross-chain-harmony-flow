@@ -120,27 +120,33 @@ export const deployments: DeploymentInfo[] = [
 export const TOKEN_CONFIG: TokenConfig = {
   'Babylon Testnet': [
     { name: 'ubbn', denom: 'ubbn', type: 'native' },
-    { name: 'cw20', denom: 'bbn1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf', type: 'cw20' }
+    // Replace with real CW20 contract address from Babylon testnet
+    { name: 'cw20', denom: 'bbn1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'cw20' }
   ],
   'Xion Testnet': [
     { name: 'uxion', denom: 'uxion', type: 'native' },
-    { name: 'cw20', denom: 'xion1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf', type: 'cw20' }
+    // Replace with real CW20 contract address from Xion testnet
+    { name: 'cw20', denom: 'xion1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'cw20' }
   ],
   'Corn Testnet': [
     { name: 'ucorn', denom: 'ucorn', type: 'native' },
-    { name: 'cw20', denom: 'corn1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf', type: 'cw20' }
+    // Replace with real CW20 contract address from Corn testnet
+    { name: 'cw20', denom: 'corn1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'cw20' }
   ],
   'Sepolia Testnet': [
     { name: 'ETH', address: '0x0000000000000000000000000000000000000000', type: 'native' },
-    { name: 'ERC20', address: '0xabcdef1234567890abcdef1234567890abcdef12', type: 'erc20' }
+    // Replace with real ERC20 contract address from Sepolia testnet
+    { name: 'ERC20', address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', type: 'erc20' }
   ],
   'Bob Testnet': [
     { name: 'ETH', address: '0x0000000000000000000000000000000000000000', type: 'native' },
-    { name: 'ERC20', address: '0xabcdef1234567890abcdef1234567890abcdef13', type: 'erc20' }
+    // Replace with real ERC20 contract address from Bob testnet
+    { name: 'ERC20', address: '0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'erc20' }
   ],
   'Corn Testnet 1': [
     { name: 'ETH', address: '0x0000000000000000000000000000000000000000', type: 'native' },
-    { name: 'ERC20', address: '0xabcdef1234567890abcdef1234567890abcdef14', type: 'erc20' }
+    // Replace with real ERC20 contract address from Corn Testnet 1
+    { name: 'ERC20', address: '0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'erc20' }
   ]
 };
 
