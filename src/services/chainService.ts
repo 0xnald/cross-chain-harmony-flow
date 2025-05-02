@@ -39,6 +39,7 @@ export const deriveAddress = async (privateKey: string, sourceChain: string): Pr
     if (sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) {
       const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
       const account = privateKeyToAccount(formattedPrivateKey);
+      console.log(`Derived EVM address for ${sourceChain}:`, account.address);
       return account.address;
     } else {
       const prefix = sourceChain.includes('Babylon') ? 'bbn' : 
@@ -49,7 +50,9 @@ export const deriveAddress = async (privateKey: string, sourceChain: string): Pr
         Buffer.from(privateKey.replace(/^0x/, ''), 'hex'),
         prefix
       );
-      return (await wallet.getAccounts())[0].address;
+      const address = (await wallet.getAccounts())[0].address;
+      console.log(`Derived Cosmos address for ${sourceChain}:`, address);
+      return address;
     }
   } catch (error) {
     console.error('Error deriving address:', error);
@@ -64,7 +67,10 @@ export const fetchTokens = async (
   useCustomRpc: boolean,
   customRpc: string
 ): Promise<Token[]> => {
-  if (!walletAddress || walletAddress.startsWith('Error') || !sourceChain) return [];
+  if (!walletAddress || walletAddress.startsWith('Error') || !sourceChain) {
+    console.log('fetchTokens: Invalid input', { walletAddress, sourceChain });
+    return [];
+  }
 
   const rpcUrl = useCustomRpc && customRpc ? customRpc : DEFAULT_RPCS[sourceChain];
   const tokenList = TOKEN_CONFIG[sourceChain] || [];
@@ -73,14 +79,18 @@ export const fetchTokens = async (
   try {
     if (!rpcUrl) throw new Error(`No RPC URL for ${sourceChain}`);
     if (!tokenList.length) throw new Error(`No tokens configured for ${sourceChain}`);
+    
+    console.log('fetchTokens: Connecting to RPC', { sourceChain, rpcUrl, tokenList });
 
     if (sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) {
       const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
       for (const token of tokenList) {
+        console.log(`Fetching balance for ${token.name} (${token.type})`, { walletAddress, tokenAddress: token.address });
         let balance;
         if (token.type === 'native') {
           const formattedAddress = walletAddress.startsWith('0x') ? walletAddress as `0x${string}` : `0x${walletAddress}` as `0x${string}`;
           balance = await publicClient.getBalance({ address: formattedAddress });
+          console.log(`Native balance for ${token.name}:`, balance.toString());
         } else {
           const tokenAddr = token.address?.startsWith('0x') ? token.address as `0x${string}` : `0x${token.address}` as `0x${string}`;
           balance = await publicClient.readContract({
@@ -89,6 +99,7 @@ export const fetchTokens = async (
             functionName: 'balanceOf',
             args: [walletAddress.startsWith('0x') ? walletAddress as `0x${string}` : `0x${walletAddress}` as `0x${string}`]
           });
+          console.log(`ERC20 balance for ${token.name}:`, balance.toString());
         }
         tokens.push({ 
           name: token.name, 
@@ -102,14 +113,17 @@ export const fetchTokens = async (
       const cosmWasmClient = await CosmWasmClient.connect(rpcUrl);
       
       for (const token of tokenList) {
+        console.log(`Fetching balance for ${token.name} (${token.type})`, { walletAddress, denom: token.denom });
         let balance;
         if (token.type === 'native') {
           const result = await stargateClient.getBalance(walletAddress, token.denom!);
           balance = result.amount;
+          console.log(`Native balance for ${token.name}:`, balance);
         } else {
           const queryMsg = { balance: { address: walletAddress } };
           const result = await cosmWasmClient.queryContractSmart(token.denom!, queryMsg);
           balance = result.balance;
+          console.log(`CW20 balance for ${token.name}:`, balance);
         }
         tokens.push({ 
           name: token.name, 
@@ -119,11 +133,11 @@ export const fetchTokens = async (
         });
       }
     }
-    console.log(`Fetched tokens for ${sourceChain}:`, tokens);
+    console.log(`fetchTokens: Successfully fetched tokens for ${sourceChain}:`, tokens);
     return tokens;
   } catch (error) {
-    console.error(`Error fetching tokens for ${sourceChain}:`, error);
-    return [];
+    console.error(`fetchTokens: Error for ${sourceChain}:`, error);
+    throw new Error(`Failed to fetch tokens: ${(error as Error).message}`);
   }
 };
 
