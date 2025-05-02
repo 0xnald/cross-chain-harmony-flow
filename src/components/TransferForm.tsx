@@ -100,6 +100,7 @@ const TransferForm = () => {
         }
       } catch (error) {
         console.error('Error deriving address for new chain:', error);
+        setTokens([]);
       } finally {
         setIsLoading(false);
       }
@@ -166,7 +167,7 @@ const TransferForm = () => {
   // Effects for updating states
   useEffect(() => {
     const fetchTokensForChain = async () => {
-      if (walletAddress && !walletAddress.startsWith('Error')) {
+      if (walletAddress && !walletAddress.startsWith('Error') && sourceChain) {
         setIsLoading(true);
         try {
           const newTokens = await fetchTokens(walletAddress, sourceChain, useCustomRpc, customRpc);
@@ -174,6 +175,7 @@ const TransferForm = () => {
             ...token,
             formattedBalance: (Number(token.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
           })));
+          setError(null);
         } catch (error) {
           console.error('Error fetching tokens:', error);
           setError(error.message);
@@ -186,10 +188,12 @@ const TransferForm = () => {
         } finally {
           setIsLoading(false);
         }
+      } else {
+        setTokens([]);
       }
     };
     fetchTokensForChain();
-  }, [sourceChain, useCustomRpc, customRpc, walletAddress]);
+  }, [sourceChain, walletAddress, useCustomRpc, customRpc]);
 
   // Check if form is valid for submission
   const isFormValid = () => {
@@ -467,7 +471,8 @@ const TransferForm = () => {
               {status}
             </div>
           )}
-   {/* Transaction Log */}
+
+          {/* Transaction Log */}
           {transactionLogs.length > 0 && (
             <div className="mt-4">
               <h3 className="font-medium mb-2">Transaction Logs</h3>
@@ -484,11 +489,6 @@ const TransferForm = () => {
               </div>
             </div>
           )}
-
-          {/* Footer */}
-          <footer className="mt-4 text-gray-500 text-sm text-center">
-            Made with ❤️ by <a href="https://x.com/linoxbt" className="underline">Linoxbt</a>
-          </footer>
         </>
       )}
     </div>
