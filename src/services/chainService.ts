@@ -1,4 +1,4 @@
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, http, createWalletClient } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
 import { DirectSecp256k1Wallet } from '@cosmjs/proto-signing';
@@ -85,10 +85,13 @@ export const fetchTokens = async (
 
   console.log('fetchTokens: RPC and token config', { rpcUrl, tokenList });
 
-  if (sourceChain.startsWith('Sepolia')) {
+  if (sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) {
     try {
-      console.log('fetchTokens: Connecting to Sepolia RPC', { rpcUrl });
-      const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
+      console.log(`fetchTokens: Connecting to EVM RPC for ${sourceChain}`, { rpcUrl });
+      const publicClient = createPublicClient({ 
+        chain: sepolia, // Note: Using sepolia chain config; adjust for Bob/Corn if needed
+        transport: http(rpcUrl) 
+      });
 
       for (const token of tokenList) {
         console.log(`fetchTokens: Processing ${token.name} (${token.type})`, { walletAddress, tokenAddress: token.address });
@@ -125,15 +128,54 @@ export const fetchTokens = async (
           type: token.type 
         });
       }
-      console.log('fetchTokens: Completed for Sepolia', { tokens });
+      console.log(`fetchTokens: Completed for ${sourceChain}`, { tokens });
       return tokens;
     } catch (rpcError) {
       console.error(`fetchTokens: RPC error for ${sourceChain}:`, rpcError);
       return [];
     }
   } else {
-    console.log(`fetchTokens: Skipping ${sourceChain} (Cosmos chain) until valid CW20 addresses are provided`);
-    return [];
+    try {
+      console.log(`fetchTokens: Connecting to Cosmos RPC for ${sourceChain}`, { rpcUrl });
+      const stargateClient = await StargateClient.connect(rpcUrl);
+      const cosmWasmClient = await CosmWasmClient.connect(rpcUrl);
+
+      for (const token of tokenList) {
+        console.log(`fetchTokens: Processing ${token.name} (${token.type})`, { walletAddress, denom: token.denom });
+        let balance;
+        if (token.type === 'native') {
+          try {
+            const result = await stargateClient.getBalance(walletAddress, token.denom!);
+            balance = result.amount;
+            console.log(`fetchTokens: Native balance for ${token.name}: ${balance}`);
+          } catch (nativeError) {
+            console.error(`fetchTokens: Error fetching native balance for ${token.name}:`, nativeError);
+            balance = '0';
+          }
+        } else {
+          try {
+            const queryMsg = { balance: { address: walletAddress } };
+            const result = await cosmWasmClient.queryContractSmart(token.denom!, queryMsg);
+            balance = result.balance;
+            console.log(`fetchTokens: CW20 balance for ${token.name}: ${balance}`);
+          } catch (cw20Error) {
+            console.error(`fetchTokens: Error fetching CW20 balance for ${token.name} at ${token.denom}:`, cw20Error);
+            balance = '0';
+          }
+        }
+        tokens.push({ 
+          name: token.name, 
+          denom: token.denom, 
+          balance, 
+          type: token.type 
+        });
+      }
+      console.log(`fetchTokens: Completed for ${sourceChain}`, { tokens });
+      return tokens;
+    } catch (rpcError) {
+      console.error(`fetchTokens: RPC error for ${sourceChain} (Cosmos):`, rpcError);
+      return [];
+    }
   }
 };
 
@@ -159,15 +201,17 @@ export const fetchTokenByContract = async (
 
   console.log('fetchTokenByContract: RPC config', { rpcUrl });
 
-  if (sourceChain.startsWith('Sepolia')) {
+  if (sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) {
     try {
-      console.log('fetchTokenByContract: Connecting to Sepolia RPC', { rpcUrl });
-      const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
+      console.log(`fetchTokenByContract: Connecting to EVM RPC for ${sourceChain}`, { rpcUrl });
+      const publicClient = createPublicClient({ 
+        chain: sepolia, // Note: Adjust for Bob/Corn if needed
+        transport: http(rpcUrl) 
+      });
 
       const tokenAddr = contractAddress.startsWith('0x') ? contractAddress : `0x${contractAddress}`;
       console.log(`fetchTokenByContract: Querying ERC20 contract at ${tokenAddr}`);
 
-      // Try to fetch token name (optional, fallback to address if fails)
       let tokenName = `Token@${tokenAddr.slice(0, 6)}`;
       try {
         const name = await publicClient.readContract({
@@ -176,13 +220,12 @@ export const fetchTokenByContract = async (
           functionName: 'name',
           args: []
         });
-        tokenName = name.toString().substring(0, 10); // Limit length
+        tokenName = name.toString().substring(0, 10);
         console.log(`fetchTokenByContract: Token name: ${tokenName}`);
       } catch (nameError) {
         console.warn(`fetchTokenByContract: Could not fetch token name for ${tokenAddr}:`, nameError);
       }
 
-      // Fetch balance
       let balance;
       try {
         balance = await publicClient.readContract({
@@ -203,19 +246,53 @@ export const fetchTokenByContract = async (
         balance: balance.toString(),
         type: 'erc20'
       };
-      console.log('fetchTokenByContract: Completed for Sepolia', { token });
+      console.log(`fetchTokenByContract: Completed for ${sourceChain}`, { token });
       return token;
     } catch (rpcError) {
       console.error(`fetchTokenByContract: RPC error for ${sourceChain}:`, rpcError);
       return null;
     }
   } else {
-    console.log(`fetchTokenByContract: Skipping ${sourceChain} (Cosmos chain) until CW20 support is added`);
-    return null;
+    try {
+      console.log(`fetchTokenByContract: Connecting to Cosmos RPC for ${sourceChain}`, { rpcUrl });
+      const cosmWasmClient = await CosmWasmClient.connect(rpcUrl);
+      console.log(`fetchTokenByContract: Querying CW20 contract at ${contractAddress}`);
+
+      let tokenName = `Token@${contractAddress.slice(0, 6)}`;
+      try {
+        const info = await cosmWasmClient.queryContractSmart(contractAddress, { token_info: {} });
+        tokenName = info.name.substring(0, 10);
+        console.log(`fetchTokenByContract: Token name: ${tokenName}`);
+      } catch (nameError) {
+        console.warn(`fetchTokenByContract: Could not fetch token name for ${contractAddress}:`, nameError);
+      }
+
+      let balance;
+      try {
+        const queryMsg = { balance: { address: walletAddress } };
+        const result = await cosmWasmClient.queryContractSmart(contractAddress, queryMsg);
+        balance = result.balance;
+        console.log(`fetchTokenByContract: CW20 balance for ${tokenName}: ${balance}`);
+      } catch (balanceError) {
+        console.error(`fetchTokenByContract: Error fetching CW20 balance for ${tokenName} at ${contractAddress}:`, balanceError);
+        return null;
+      }
+
+      const token: Token = {
+        name: tokenName,
+        denom: contractAddress,
+        balance,
+        type: 'cw20'
+      };
+      console.log(`fetchTokenByContract: Completed for ${sourceChain}`, { token });
+      return token;
+    } catch (rpcError) {
+      console.error(`fetchTokenByContract: RPC error for ${sourceChain}:`, rpcError);
+      return null;
+    }
   }
 };
 
-// Note: executeTransfer remains unchanged from previous version
 export const executeTransfer = async (
   privateKey: string,
   sourceChain: string,
