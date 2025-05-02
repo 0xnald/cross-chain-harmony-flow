@@ -191,11 +191,14 @@ export const executeTransfer = async (
         
         // Ensure private key has 0x prefix and convert to the required type
         const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
+        // Create account from private key
+        const account = privateKeyToAccount(formattedPrivateKey);
         
+        // Create wallet client with account passed in the configuration
         const walletClient = createWalletClient({
           chain: sepolia,
           transport: http(rpcUrl),
-          account: privateKeyToAccount(formattedPrivateKey)
+          account
         });
         
         const gasPriceWei = BigInt(parseFloat(gasPrice) * 1e9);
@@ -213,6 +216,7 @@ export const executeTransfer = async (
           destAddress as `0x${string}` : 
           `0x${destAddress}` as `0x${string}`;
         
+        // Account is now in the wallet client configuration, not needed in writeContract
         const tx = await walletClient.writeContract({
           address: sourceContractAddr,
           abi: UCS03_ABI,
