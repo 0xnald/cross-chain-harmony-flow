@@ -1,8 +1,10 @@
 
-import { createPublicClient, createWalletClient, http, privateKeyToAccount, readContract } from 'viem';
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
 import { DirectSecp256k1Wallet } from '@cosmjs/proto-signing';
 import { StargateClient, SigningStargateClient } from '@cosmjs/stargate';
+import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate';
 import { channels, DEFAULT_RPCS, TOKEN_CONFIG, deployments, UCS03_ABI, ERC20_ABI } from './constants';
 import { Token, TransactionLog } from './types';
 
@@ -43,7 +45,9 @@ export const deriveAddress = async (privateKey: string, sourceChain: string): Pr
     if (!privateKey) return '';
     
     if (sourceChain.startsWith('ethereum') || sourceChain.startsWith('bob') || sourceChain.startsWith('corn')) {
-      const account = privateKeyToAccount(`0x${privateKey.replace(/^0x/, '')}`);
+      // Ensure private key has 0x prefix and convert to the required type
+      const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
+      const account = privateKeyToAccount(formattedPrivateKey);
       return account.address;
     } else {
       const prefix = sourceChain.includes('babylon') ? 'bbn' : 
@@ -81,13 +85,19 @@ export const fetchTokens = async (
       for (const token of tokenList) {
         let balance;
         if (token.type === 'native') {
-          balance = await publicClient.getBalance({ address: walletAddress });
+          // Convert address to required 0x format
+          const formattedAddress = walletAddress.startsWith('0x') ? walletAddress as `0x${string}` : `0x${walletAddress}` as `0x${string}`;
+          balance = await publicClient.getBalance({ address: formattedAddress });
         } else {
-          balance = await readContract(publicClient, {
-            address: token.address!,
+          // Convert token address to required 0x format
+          const tokenAddr = token.address?.startsWith('0x') ? token.address as `0x${string}` : `0x${token.address}` as `0x${string}`;
+          
+          // Using publicClient.readContract instead of imported readContract
+          balance = await publicClient.readContract({
+            address: tokenAddr,
             abi: ERC20_ABI,
             functionName: 'balanceOf',
-            args: [walletAddress]
+            args: [walletAddress.startsWith('0x') ? walletAddress as `0x${string}` : `0x${walletAddress}` as `0x${string}`]
           });
         }
         tokens.push({ 
@@ -98,15 +108,18 @@ export const fetchTokens = async (
         });
       }
     } else {
-      const client = await StargateClient.connect(rpcUrl);
+      const stargateClient = await StargateClient.connect(rpcUrl);
+      const cosmWasmClient = await CosmWasmClient.connect(rpcUrl);
+      
       for (const token of tokenList) {
         let balance;
         if (token.type === 'native') {
-          const result = await client.getBalance(walletAddress, token.denom!);
+          const result = await stargateClient.getBalance(walletAddress, token.denom!);
           balance = result.amount;
         } else {
+          // Using CosmWasmClient for smart contract queries
           const queryMsg = { balance: { address: walletAddress } };
-          const result = await client.queryContractSmart(token.denom!, queryMsg);
+          const result = await cosmWasmClient.queryContractSmart(token.denom!, queryMsg);
           balance = result.balance;
         }
         tokens.push({ 
@@ -175,18 +188,36 @@ export const executeTransfer = async (
       if (sourceChain.startsWith('ethereum') || sourceChain.startsWith('bob') || sourceChain.startsWith('corn')) {
         const rpcUrl = useCustomRpc && customRpc ? customRpc : DEFAULT_RPCS[sourceChain];
         const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
+        
+        // Ensure private key has 0x prefix and convert to the required type
+        const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
+        
         const walletClient = createWalletClient({
           chain: sepolia,
           transport: http(rpcUrl),
-          account: privateKeyToAccount(`0x${privateKey.replace(/^0x/, '')}`)
+          account: privateKeyToAccount(formattedPrivateKey)
         });
+        
         const gasPriceWei = BigInt(parseFloat(gasPrice) * 1e9);
         
+        // Convert addresses to the required 0x format
+        const sourceContractAddr = sourceContract.startsWith('0x') ? 
+          sourceContract as `0x${string}` : 
+          `0x${sourceContract}` as `0x${string}`;
+          
+        const tokenAddr = tokenAddress.startsWith('0x') ? 
+          tokenAddress as `0x${string}` : 
+          `0x${tokenAddress}` as `0x${string}`;
+          
+        const destAddr = destAddress.startsWith('0x') ? 
+          destAddress as `0x${string}` : 
+          `0x${destAddress}` as `0x${string}`;
+        
         const tx = await walletClient.writeContract({
-          address: sourceContract,
+          address: sourceContractAddr,
           abi: UCS03_ABI,
           functionName: 'sendPacket',
-          args: [destAddress, channelId, amount, tokenAddress],
+          args: [destAddr, channelId, amount, tokenAddr],
           gasPrice: gasPriceWei
         });
         
