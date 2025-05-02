@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Token, TransactionLog } from '../services/types';
 import { channels, DEFAULT_RPCS } from '../services/constants';
-import { deriveAddress, fetchTokens, executeTransfer, getChainBadgeClass, getSlaMessage } from '../services/chainService';
+import { deriveAddress, fetchTokens, fetchTokenByContract, executeTransfer, getChainBadgeClass, getSlaMessage } from '../services/chainService';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Select,
@@ -10,12 +10,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const TransferForm = () => {
   const [privateKey, setPrivateKey] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
-  const [sourceChain, setSourceChain] = useState('Babylon Testnet');
-  const [destChain, setDestChain] = useState('Xion Testnet');
+  const [sourceChain, setSourceChain] = useState('Sepolia Testnet');
+  const [destChain, setDestChain] = useState('Babylon Testnet');
   const [amount, setAmount] = useState('');
   const [tokenAddress, setTokenAddress] = useState('');
   const [selectedToken, setSelectedToken] = useState('');
@@ -30,6 +32,7 @@ const TransferForm = () => {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [customContractAddress, setCustomContractAddress] = useState('');
   const { toast } = useToast();
 
   const handlePrivateKeyChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,9 +44,9 @@ const TransferForm = () => {
         const address = await deriveAddress(newPrivateKey, sourceChain);
         setWalletAddress(address);
         if (!address.startsWith('Error')) {
-          const tokens = await fetchTokens(address, sourceChain, useCustomRpc, customRpc);
-          console.log('Tokens fetched for wallet:', { sourceChain, walletAddress: address, tokens });
-          setTokens(tokens.map(token => ({
+          const fetchedTokens = await fetchTokens(address, sourceChain, useCustomRpc, customRpc);
+          console.log('Tokens fetched for wallet:', { sourceChain, walletAddress: address, tokens: fetchedTokens });
+          setTokens(fetchedTokens.map(token => ({
             ...token,
             formattedBalance: (Number(token.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
           })));
@@ -74,9 +77,9 @@ const TransferForm = () => {
         const address = await deriveAddress(privateKey, newSourceChain);
         setWalletAddress(address);
         if (!address.startsWith('Error')) {
-          const tokens = await fetchTokens(address, newSourceChain, useCustomRpc, customRpc);
-          console.log('Tokens fetched for chain change:', { sourceChain: newSourceChain, walletAddress: address, tokens });
-          setTokens(tokens.map(token => ({
+          const fetchedTokens = await fetchTokens(address, newSourceChain, useCustomRpc, customRpc);
+          console.log('Tokens fetched for chain change:', { sourceChain: newSourceChain, walletAddress: address, tokens: fetchedTokens });
+          setTokens(fetchedTokens.map(token => ({
             ...token,
             formattedBalance: (Number(token.balance) / (newSourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
           })));
@@ -96,6 +99,44 @@ const TransferForm = () => {
     setSelectedToken(value);
     const token = tokens.find(t => t.name === value);
     setTokenAddress(token ? (token.denom || token.address || '') : '');
+  };
+
+  const handleSearchContract = async () => {
+    if (!customContractAddress || !walletAddress || walletAddress.startsWith('Error')) {
+      toast({ title: "Invalid input", description: "Please enter a contract address and connect a wallet.", variant: "destructive" });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      console.log('Searching for token:', { contractAddress: customContractAddress, sourceChain, walletAddress });
+      const newToken = await fetchTokenByContract(walletAddress, sourceChain, customContractAddress, useCustomRpc, customRpc);
+      if (newToken) {
+        const formattedToken = {
+          ...newToken,
+          formattedBalance: (Number(newToken.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
+        };
+        setTokens(prevTokens => {
+          const exists = prevTokens.some(t => t.address === newToken.address || t.denom === newToken.denom);
+          if (exists) {
+            return prevTokens.map(t =>
+              (t.address === newToken.address || t.denom === newToken.denom) ? formattedToken : t
+            );
+          }
+          return [...prevTokens, formattedToken];
+        });
+        setSelectedToken(newToken.name);
+        setTokenAddress(newToken.denom || newToken.address || '');
+        toast({ title: "Token added", description: `Found ${newToken.name} with balance ${formattedToken.formattedBalance}.` });
+      } else {
+        toast({ title: "No token found", description: "Could not fetch token at this address.", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error('Error fetching token by contract:', error);
+      toast({ title: "Search error", description: `${(error as Error).message}`, variant: "destructive" });
+    } finally {
+      setCustomContractAddress('');
+      setIsLoading(false);
+    }
   };
 
   const handleTransfer = async () => {
@@ -195,12 +236,12 @@ const TransferForm = () => {
 
       <div className="mb-4">
         <label className="block font-medium text-sm mb-1">Private Key</label>
-        <input
+        <Input
           type="password"
           value={privateKey}
           onChange={handlePrivateKeyChange}
           placeholder="Enter private key (0x...)"
-          className="w-full rounded-md border border-muted bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="w-full"
         />
         <div className="mt-1.5 flex items-center text-sm">
           <span className="text-muted-foreground mr-2">Wallet Address:</span>
@@ -292,12 +333,12 @@ const TransferForm = () => {
 
       <div className="mb-4">
         <label className="block font-medium text-sm mb-1">Destination Address</label>
-        <input
+        <Input
           type="text"
           value={destAddress}
           onChange={(e) => setDestAddress(e.target.value)}
           placeholder="Receiver address (e.g., bbn1... or 0x...)"
-          className="w-full rounded-md border border-muted bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="w-full"
         />
       </div>
 
@@ -309,14 +350,14 @@ const TransferForm = () => {
             onValueChange={handleTokenSelection}
             disabled={isLoading || !walletAddress || walletAddress.startsWith('Error')}
           >
-            <SelectTrigger className="w-full rounded-md border border-muted bg-muted/50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+            <SelectTrigger className="w-full bg-muted/50 border border-muted">
               <SelectValue placeholder={isLoading ? "Loading tokens..." : "Select a token"} />
             </SelectTrigger>
             <SelectContent className="bg-muted/50 border border-muted rounded-md">
               {tokens.length === 0 ? (
-                <SelectItem value="none" disabled>
+                <div className="px-3 py-2 text-sm text-muted-foreground">
                   {isLoading ? "Loading tokens..." : "No tokens available"}
-                </SelectItem>
+                </div>
               ) : (
                 tokens.map(token => (
                   <SelectItem key={token.name} value={token.name}>
@@ -330,26 +371,47 @@ const TransferForm = () => {
 
         <div className="mb-4">
           <label className="block font-medium text-sm mb-1">Amount</label>
-          <input
+          <Input
             type="text"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="Amount"
-            className="w-full rounded-md border border-muted bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full"
           />
         </div>
       </div>
 
       <div className="mb-4">
+        <label className="block font-medium text-sm mb-1">Custom Token Contract Address</label>
+        <div className="flex gap-2">
+          <Input
+            type="text"
+            value={customContractAddress}
+            onChange={(e) => setCustomContractAddress(e.target.value)}
+            placeholder={sourceChain.startsWith('Sepolia') ? "ERC20 address (0x...)" : "CW20 address (bbn1...)"}
+            className="w-full"
+            disabled={isLoading || !walletAddress || walletAddress.startsWith('Error')}
+          />
+          <Button
+            onClick={handleSearchContract}
+            disabled={isLoading || !customContractAddress || !walletAddress || walletAddress.startsWith('Error')}
+            className="bg-primary hover:bg-primary/80"
+          >
+            Search
+          </Button>
+        </div>
+      </div>
+
+      <div className="mb-4">
         <label className="block font-medium text-sm mb-1">Number of Transactions</label>
-        <input
+        <Input
           type="number"
           value={numTransactions}
           onChange={(e) => setNumTransactions(e.target.value)}
           placeholder="Number of transactions (1-100)"
           min="1"
           max="100"
-          className="w-full rounded-md border border-muted bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="w-full"
         />
       </div>
 
@@ -368,38 +430,34 @@ const TransferForm = () => {
             <span className="text-sm">Use Custom RPC</span>
           </label>
           {useCustomRpc && (
-            <input
+            <Input
               type="text"
               value={customRpc}
               onChange={(e) => setCustomRpc(e.target.value)}
               placeholder="Custom RPC URL (e.g., https://rpc.sepolia.org)"
-              className="mt-2 w-full rounded-md border border-muted bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="mt-2 w-full"
             />
           )}
         </div>
         {(sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) && (
           <div>
             <label className="block text-sm mb-1">Gas Price (Gwei)</label>
-            <input
+            <Input
               type="number"
               value={gasPrice}
               onChange={(e) => setGasPrice(e.target.value)}
               placeholder="Gas price in Gwei (e.g., 5)"
               min="1"
-              className="w-full rounded-md border border-muted bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full"
             />
           </div>
         )}
       </div>
 
-      <button
+      <Button
         onClick={handleTransfer}
         disabled={isLoading || !isFormValid()}
-        className={`w-full py-3 px-4 rounded-lg font-medium text-white transition-all duration-200 ${
-          isLoading || !isFormValid() 
-            ? 'bg-muted cursor-not-allowed opacity-50' 
-            : 'bg-primary hover:bg-primary/80'
-        }`}
+        className={`w-full py-3 ${isLoading || !isFormValid() ? 'bg-muted cursor-not-allowed opacity-50' : 'bg-primary hover:bg-primary/80'}`}
       >
         {isLoading ? (
           <span className="flex items-center justify-center">
@@ -410,9 +468,9 @@ const TransferForm = () => {
             Processing...
           </span>
         ) : (
-          'Transfer'
+           'Transfer'
         )}
-      </button>
+      </Button>
 
       {status && (
         <div className={`mt-4 p-3 rounded ${
