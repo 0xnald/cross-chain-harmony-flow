@@ -71,6 +71,9 @@ export const fetchTokens = async (
   const tokens: Token[] = [];
 
   try {
+    if (!rpcUrl) throw new Error(`No RPC URL for ${sourceChain}`);
+    if (!tokenList.length) throw new Error(`No tokens configured for ${sourceChain}`);
+
     if (sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) {
       const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
       for (const token of tokenList) {
