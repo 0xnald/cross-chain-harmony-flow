@@ -32,7 +32,7 @@ const TransferForm = () => {
   const [transactionLogs, setTransactionLogs] = useState<TransactionLog[]>([]);
   const [tokens, setTokens] = useState<Token[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   
   const { toast } = useToast();
 
@@ -49,7 +49,7 @@ const TransferForm = () => {
         
         if (!address.startsWith('Error')) {
           const tokens = await fetchTokens(address, sourceChain, useCustomRpc, customRpc);
-          console.log('Tokens fetched for wallet:', tokens);
+          console.log('Tokens fetched for wallet:', { sourceChain, walletAddress: address, tokens });
           setTokens(tokens.map(token => ({
             ...token,
             formattedBalance: (Number(token.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
@@ -92,7 +92,7 @@ const TransferForm = () => {
         
         if (!address.startsWith('Error')) {
           const tokens = await fetchTokens(address, newSourceChain, useCustomRpc, customRpc);
-          console.log('Tokens fetched for chain change:', tokens);
+          console.log('Tokens fetched for chain change:', { sourceChain: newSourceChain, walletAddress: address, tokens });
           setTokens(tokens.map(token => ({
             ...token,
             formattedBalance: (Number(token.balance) / (newSourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
@@ -173,18 +173,19 @@ const TransferForm = () => {
         setIsLoading(true);
         try {
           const newTokens = await fetchTokens(walletAddress, sourceChain, useCustomRpc, customRpc);
-          console.log('Tokens fetched in useEffect:', newTokens);
+          console.log('Tokens fetched in useEffect:', { sourceChain, walletAddress, tokens: newTokens });
           setTokens(newTokens.map(token => ({
             ...token,
             formattedBalance: (Number(token.balance) / (sourceChain.startsWith('Sepolia') ? 1e18 : 1e6)).toFixed(2)
           })));
           setError(null);
         } catch (error) {
+          const errorMessage = (error as Error).message || 'Unknown error fetching tokens';
           console.error('Error fetching tokens in useEffect:', error);
-          setError(error.message);
+          setError(errorMessage);
           toast({
             title: "Error fetching tokens",
-            description: `${(error as Error).message}`,
+            description: errorMessage,
             variant: "destructive"
           });
           setTokens([]);
@@ -253,7 +254,7 @@ const TransferForm = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Source زنجیره Selection */}
+            {/* Source Chain Selection */}
             <div className="mb-4">
               <label className="block font-medium text-sm mb-1">Source Chain</label>
               <div className="relative">
@@ -352,13 +353,16 @@ const TransferForm = () => {
               <Select
                 value={selectedToken}
                 onValueChange={handleTokenSelection}
+                disabled={isLoading || !walletAddress || walletAddress.startsWith('Error')}
               >
-                <SelectTrigger className="w-full border p-2 bg-white z-10">
-                  <SelectValue placeholder="Select a token" />
+                <SelectTrigger className="w-full rounded-md border border-muted bg-muted/50 px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring">
+                  <SelectValue placeholder={isLoading ? "Loading tokens..." : "Select a token"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-muted/50 border-muted">
                   {tokens.length === 0 ? (
-                    <SelectItem value="none">No tokens available</SelectItem>
+                    <SelectItem value="none" disabled>
+                      {isLoading ? "Loading tokens..." : "No tokens available"}
+                    </SelectItem>
                   ) : (
                     tokens.map(token => (
                       <SelectItem key={token.name} value={token.name}>
@@ -498,4 +502,4 @@ const TransferForm = () => {
   );
 };
 
-export default TransferForm;
+export default TransferForm; on 
