@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, http } from 'viem';
+import { createPublicClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
 import { DirectSecp256k1Wallet } from '@cosmjs/proto-signing';
@@ -7,7 +7,6 @@ import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate';
 import { channels, DEFAULT_RPCS, TOKEN_CONFIG, deployments, UCS03_ABI, ERC20_ABI } from './constants';
 import { Token, TransactionLog } from './types';
 
-// Get chain badge class based on chain ID
 export const getChainBadgeClass = (chainId: string): string => {
   if (chainId.includes('Babylon')) return 'chain-badge-babylon';
   if (chainId.includes('Xion')) return 'chain-badge-xion';
@@ -17,7 +16,6 @@ export const getChainBadgeClass = (chainId: string): string => {
   return '';
 };
 
-// Get SLA message for transfer duration
 export const getSlaMessage = (sourceChain: string, destChain: string): string => {
   const channelId = Object.keys(channels[sourceChain] || {}).find(id =>
     channels[sourceChain]?.[id]?.comments?.includes(destChain)
@@ -26,16 +24,13 @@ export const getSlaMessage = (sourceChain: string, destChain: string): string =>
   return sla ? `Transfer may take up to ${sla.replace('PT', '').toLowerCase()}` : '';
 };
 
-// Get transaction explorer URL based on chain
 export const getExplorerUrl = (txHash: string, chain: string): string => {
   return `https://app.union.build/explorer/${txHash}`;
 };
 
-// Derive wallet address from private key
 export const deriveAddress = async (privateKey: string, sourceChain: string): Promise<string> => {
   try {
     if (!privateKey) return '';
-    
     if (sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) {
       const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
       const account = privateKeyToAccount(formattedPrivateKey);
@@ -45,7 +40,6 @@ export const deriveAddress = async (privateKey: string, sourceChain: string): Pr
       const prefix = sourceChain.includes('Babylon') ? 'bbn' : 
                     sourceChain.includes('Xion') ? 'xion' : 
                     sourceChain.includes('Corn') ? 'corn' : 'cosmos';
-      
       const wallet = await DirectSecp256k1Wallet.fromKey(
         Buffer.from(privateKey.replace(/^0x/, ''), 'hex'),
         prefix
@@ -60,7 +54,6 @@ export const deriveAddress = async (privateKey: string, sourceChain: string): Pr
   }
 };
 
-// Fetch available tokens and their balances
 export const fetchTokens = async (
   walletAddress: string,
   sourceChain: string,
@@ -77,8 +70,14 @@ export const fetchTokens = async (
   const tokens: Token[] = [];
 
   try {
-    if (!rpcUrl) throw new Error(`No RPC URL for ${sourceChain}`);
-    if (!tokenList.length) throw new Error(`No tokens configured for ${sourceChain}`);
+    if (!rpcUrl) {
+      console.error(`fetchTokens: No RPC URL for ${sourceChain}`);
+      return [];
+    }
+    if (!tokenList.length) {
+      console.error(`fetchTokens: No tokens configured for ${sourceChain}`);
+      return [];
+    }
     
     console.log('fetchTokens: Connecting to RPC', { sourceChain, rpcUrl, tokenList });
 
@@ -111,7 +110,6 @@ export const fetchTokens = async (
     } else {
       const stargateClient = await StargateClient.connect(rpcUrl);
       const cosmWasmClient = await CosmWasmClient.connect(rpcUrl);
-      
       for (const token of tokenList) {
         console.log(`Fetching balance for ${token.name} (${token.type})`, { walletAddress, denom: token.denom });
         let balance;
@@ -137,11 +135,10 @@ export const fetchTokens = async (
     return tokens;
   } catch (error) {
     console.error(`fetchTokens: Error for ${sourceChain}:`, error);
-    throw new Error(`Failed to fetch tokens: ${(error as Error).message}`);
+    return [];
   }
 };
 
-// Execute transfer between chains
 export const executeTransfer = async (
   privateKey: string,
   sourceChain: string,
@@ -159,28 +156,21 @@ export const executeTransfer = async (
 ): Promise<string> => {
   try {
     updateLogs({ message: 'Initiating transfers...', type: 'info' });
-
     const numTxs = parseInt(numTransactions, 10);
     if (isNaN(numTxs) || numTxs < 1 || numTxs > 100) {
       throw new Error('Number of transactions must be between 1 and 100');
     }
-
     const selectedTokenData = tokens.find(t => t.name === selectedToken);
     if (!selectedTokenData) throw new Error('No token selected');
-    
     const balance = BigInt(selectedTokenData.balance);
     const transferAmount = BigInt(amount);
     if (transferAmount > balance) throw new Error('Amount exceeds balance');
-
     const channelId = Object.keys(channels[sourceChain] || {}).find(id =>
       channels[sourceChain]?.[id]?.comments?.includes(destChain)
     );
-    
     if (!channelId) throw new Error('No channel found between the source and destination chains');
-
     const deploymentInfo = deployments.find(d => d.universal_chain_id === sourceChain);
     if (!deploymentInfo) throw new Error('No deployment found for the source chain');
-    
     const sourceContract = deploymentInfo.deployments.app.ucs03.address;
 
     for (let i = 1; i <= numTxs; i++) {
@@ -188,34 +178,26 @@ export const executeTransfer = async (
         message: `Transaction ${i}/${numTxs}: Initiating... (${numTxs - i} remaining)`,
         type: 'info'
       });
-
       if (sourceChain.startsWith('Sepolia') || sourceChain.startsWith('Bob') || sourceChain.startsWith('Corn')) {
         const rpcUrl = useCustomRpc && customRpc ? customRpc : DEFAULT_RPCS[sourceChain];
         const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
-        
         const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
         const account = privateKeyToAccount(formattedPrivateKey);
-        
         const walletClient = createWalletClient({
           chain: sepolia,
           transport: http(rpcUrl),
           account
         });
-        
         const gasPriceWei = BigInt(parseFloat(gasPrice) * 1e9);
-        
         const sourceContractAddr = sourceContract.startsWith('0x') ? 
           sourceContract as `0x${string}` : 
           `0x${sourceContract}` as `0x${string}`;
-          
         const tokenAddr = tokenAddress.startsWith('0x') ? 
           tokenAddress as `0x${string}` : 
           `0x${tokenAddress}` as `0x${string}`;
-          
         const destAddr = destAddress.startsWith('0x') ? 
           destAddress as `0x${string}` : 
           `0x${destAddress}` as `0x${string}`;
-        
         const tx = await walletClient.writeContract({
           address: sourceContractAddr,
           abi: UCS03_ABI,
@@ -223,7 +205,6 @@ export const executeTransfer = async (
           args: [destAddr, channelId, amount, tokenAddr],
           gasPrice: gasPriceWei
         });
-        
         const explorerUrl = getExplorerUrl(tx, sourceChain);
         updateLogs({ 
           message: `Transaction ${i}/${numTxs}: EVM tx ${tx} (${numTxs - i} remaining)`, 
@@ -238,12 +219,10 @@ export const executeTransfer = async (
         const prefix = sourceChain.includes('Babylon') ? 'bbn' :
                       sourceChain.includes('Xion') ? 'xion' : 
                       sourceChain.includes('Corn') ? 'corn' : 'cosmos';
-                      
         const wallet = await DirectSecp256k1Wallet.fromKey(
           Buffer.from(privateKey.replace(/^0x/, ''), 'hex'),
           prefix
         );
-        
         const client = await SigningStargateClient.connectWithSigner(rpcUrl, wallet);
         const msg = {
           typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
@@ -261,13 +240,11 @@ export const executeTransfer = async (
             funds: []
           }
         };
-        
         const result = await client.signAndBroadcast(
           (await wallet.getAccounts())[0].address,
           [msg],
           'auto'
         );
-        
         const explorerUrl = getExplorerUrl(result.transactionHash, sourceChain);
         updateLogs({ 
           message: `Transaction ${i}/${numTxs}: Cosmos tx ${result.transactionHash} (${numTxs - i} remaining)`,
@@ -279,7 +256,6 @@ export const executeTransfer = async (
         });
       }
     }
-
     const slaMessage = getSlaMessage(sourceChain, destChain);
     return `Completed ${numTxs} transfers. ${slaMessage}`;
   } catch (error) {
